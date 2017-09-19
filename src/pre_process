@@ -1,0 +1,87 @@
+#coding=utf-8
+
+import numpy as np
+import pandas as pd
+import pickle
+import math
+import logging
+import datetime
+from logging import info
+logging.basicConfig(level = logging.INFO)
+import sklearn
+
+# frameworks for ML
+from sklearn_pandas import DataFrameMapper
+from sklearn.pipeline import make_pipeline
+from sklearn.cross_validation import cross_val_score
+from sklearn.grid_search import GridSearchCV
+
+
+# transformers for category variables
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+
+
+# transformers for numerical variables
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
+
+
+# transformers for combined variables
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import PolynomialFeatures
+
+
+# user-defined transformers
+from sklearn.preprocessing import FunctionTransformer
+
+
+# classification models
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+
+# evaluation
+from sklearn.metrics import scorer
+
+
+
+### 1.读入全部数据
+data_all = pd.read_csv("data/tianchi_fresh_comp_train_user.csv")
+
+data_all = data_all.sample(n = 2000000)
+
+first_day  = datetime.datetime.strptime('2014-12-18','%Y-%m-%d')
+
+data_all_time = data_all["time"]
+
+data_all_date = data_all_time.map(lambda time:time.split()[0])
+
+data_all["time"] = data_all_date
+
+data_all["gap_days"] = data_all_date.map(lambda data_all_date:
+                                     int((first_day - datetime.datetime.strptime(data_all_date,'%Y-%m-%d')).days))
+
+
+data_3_days = data_all[data_all["gap_days"]< 3]
+
+cate_mapper = {1:'view',2:'collect',3:'cart',4:'buy'}
+
+data_3_days['behavior_type'] = data_3_days['behavior_type'].map(cate_mapper)
+
+data_3_days = data_3_days.join(pd.get_dummies(data_3_days['behavior_type']))
+
+data_3_days = data_3_days.groupby(['time','user_id','item_id'],as_index = False).sum()
+
+data_3_days.to_csv("data_3_days.csv")  # 持久化
+
+
+# mapper = DataFrameMapper(
+# [
+#  (['behavior_type'], OneHotEncoder())
+#  ])
+# # print (mapper)
+# print(mapper.fit_transform(data_3_days))
