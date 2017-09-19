@@ -1,0 +1,149 @@
+#coding=utf-8
+
+import numpy as np
+import pandas as pd
+import pickle
+import math
+import logging
+import datetime
+from logging import info
+logging.basicConfig(level = logging.INFO)
+import sklearn
+
+# frameworks for ML
+from sklearn_pandas import DataFrameMapper
+from sklearn.pipeline import make_pipeline
+from sklearn.cross_validation import cross_val_score
+from sklearn.grid_search import GridSearchCV
+
+
+# transformers for category variables
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+
+
+# transformers for numerical variables
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
+
+
+# transformers for combined variables
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import PolynomialFeatures
+
+
+# user-defined transformers
+from sklearn.preprocessing import FunctionTransformer
+
+
+# classification models
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+
+# evaluation
+from sklearn.metrics import scorer
+
+# data_all = pd.read_csv("data_3_days.csv")
+
+dataDay_load = pd.read_csv('data_3_days.csv',usecols = ['time','user_id','item_id','buy',
+                                                    'cart','collect','view'], index_col = 'time',parse_dates = True)
+
+train_x = dataDay_load.ix['2014-12-16',:]
+
+train_y = dataDay_load.ix['2014-12-17',['user_id','item_id','buy']]
+
+dataSet = pd.merge(train_x,train_y, on = ['user_id','item_id'],suffixes=('_x','_y'), how = 'left').fillna(0.0)
+
+# print (dataSet.describe())
+# print (dataSet[dataSet['buy_x']>0])
+# exit(0)
+dataSet['labels'] = dataSet.buy_y.map(lambda x: 1.0 if x > 0.0 else 0.0 )
+
+trainSet = dataSet.copy()
+
+trainSet.to_csv('trainSet.csv')
+
+test_x = dataDay_load.ix['2014-12-17',:]
+
+test_y = dataDay_load.ix['2014-12-18',['user_id','item_id','buy']]
+
+testSet = pd.merge(test_x,test_y, on = ['user_id','item_id'],suffixes=('_x','_y'), how = 'left').fillna(0.0)
+
+testSet['labels'] = testSet.buy_y.map(lambda x: 1.0 if x > 0.0 else 0.0 )
+
+testSet.to_csv('testSet.csv')
+
+
+#LR
+from sklearn.linear_model import LogisticRegression
+
+model = LogisticRegression()
+
+model.fit(trainSet.ix[:,2:6],trainSet.ix[:,-1])
+
+
+lrW = LogisticRegression(C=1.0, class_weight='auto', dual=False, fit_intercept=True,
+              intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
+              penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
+              verbose=0, warm_start=False)
+
+model.score(trainSet.ix[:,2:6],trainSet.ix[:,-1])
+
+train_y_est = model.predict(trainSet.ix[:,2:6])
+
+train_y_est.sum()
+
+# lrW = LogisticRegression(class_weight ='auto')#针对样本不均衡问题，设置参数"class_weight
+
+lrW.fit(trainSet.ix[:,2:6],trainSet.ix[:,-1])
+
+trainLRW_y = lrW.predict(trainSet.ix[:,2:6])
+
+trainLRW_y.sum()
+
+lrW.score(trainSet.ix[:,2:6],trainSet.ix[:,-1])
+
+testLRW_y = lrW.predict(test_x.ix[:,2:6])
+
+precision_test = cross_val_score(lrW,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'precision')
+
+recall_test = cross_val_score(lrW,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'recall')
+
+f1_test = cross_val_score(lrW,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'f1')
+
+print ('LR的f1得分：\n',np.mean(f1_test))
+
+
+#GBDT
+from sklearn.ensemble import GradientBoostingClassifier
+
+gbdt = GradientBoostingClassifier(random_state = 10)
+
+gbdt.fit(trainSet.ix[:,2:6],trainSet.ix[:,-1])
+trainGBDT_y = gbdt.predict(trainSet.ix[:,2:6])
+
+trainGBDT_y.sum()
+
+print(gbdt.score(trainSet.ix[:,2:6],trainSet.ix[:,-1]))
+
+precision_test = cross_val_score(gbdt,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'precision')
+
+recall_test = cross_val_score(gbdt,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'recall')
+
+f1_test = cross_val_score(gbdt,testSet.ix[:,2:6],testSet.ix[:,-1],cv = 5,scoring = 'f1')
+
+print ('GDBT的f1得分：\n',np.mean(f1_test))
+# predict_x = dataDay_load.ix['2014-12-18',:]
+#
+# predict_x.to_csv('predict_x.csv')
+#
+# predict_y = lrW.predict(predict_x.ix[:,2:])
+#
+# user_item_19 = predict_x.ix[predict_y > 0.0,['user_id','item_id']]
+#
+# user_item_19.to_csv('predict.csv',index = False,encoding = 'utf-8')
+
